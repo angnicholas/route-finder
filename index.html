@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset='utf-8' />
+    <title>Route Finder</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+	
+    <script src='https://api.tiles.mapbox.com/mapbox-gl-js/v0.48.0/mapbox-gl.js'></script>
+    <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v0.48.0/mapbox-gl.css' rel='stylesheet' />
+	
+	<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css">
+	<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+	
+    <style>
+        body { margin:0; padding:0; 
+			background-color: #333;
+			color:#eee;
+		}
+		
+		input {
+			color: #222;
+		}
+		
+		p {
+			padding: 2%;
+		}
+		
+		input {
+			margin: 2%;
+		}
+		
+		#map-container {
+			height:600px;
+			padding-left:1%;
+			padding-right:1%;
+		}
+		
+        #map { 
+			position:relative; width:100%; height:100%; overflow:hidden; touch-action:none;		
+		}
+		
+		.mapboxgl-popup {
+			max-width: 400px;
+			font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    	}
+		
+		#sidebar{
+			padding:1%;
+		}
+		
+		.mapboxgl-marker {
+			display: block;
+			border: none;
+			border-radius: 50%;
+			cursor: pointer;
+			padding: 0;
+			background-color:blue;
+			text-align:center;
+		}
+		
+		.waypointswrapper {
+			background-color: #E76616;
+			padding-left:5%;
+			padding-top:5%;
+			position: relative;
+			padding-bottom:12%;
+			
+		}
+		
+		input.calculate {
+			background-color: #00EE00;
+			font-size: 1.5em;
+			padding:3.7%;
+			
+			border: 0px;
+			position: absolute;
+			right: 0;
+			bottom: 0;
+		}
+		
+		tr:hover {
+			background-color: #222;
+		}
+				
+		
+		
+		
+    </style>
+</head>
+<body>
+
+<script>
+	
+	$(document).ready(function(){
+		
+		mapboxgl.accessToken = 'pk.eyJ1IjoibmF0eTEzMzciLCJhIjoiY2psNTY2dG1qMmppejNybG1iaGJvOW9mNyJ9._c6IGz6LfNjStoXQq-zrUw';
+		var cpField = $(".cp-input");
+		var submitButton=$(".submit");
+		var clearButton=$(".clear");
+		
+		var focus = 0;
+		var wp = [[0, 0]]
+		var n = 2
+		var markers = [0, 0]
+		
+		var routeData={
+			type: "FeatureCollection",
+			features:[]
+		}					
+		
+		var map = new mapboxgl.Map({
+			container: 'map', // container id
+			style: 'mapbox://styles/mapbox/streets-v9', // stylesheet location
+			center: [103.81, 1.30], // starting position [lng, lat]
+			zoom: 13 // starting zoom
+		});
+		
+		function mgr(coord){
+			x = 111439.470923771*(coord[0]) - 11543132.1445949
+			y = 110870.631752153*(coord[1]) - 112781.652488995
+			return [x/10, y/10]
+		}
+		
+		function triangleArea(p, q, r){
+			var foo = mgr(p); py = foo[1]; px = foo[0]
+			var foo = mgr(q); qy = foo[1]; qx = foo[0]
+			var foo = mgr(r); ry = foo[1]; rx = foo[0]
+			return 0.5*Math.abs(((px-rx)*(qy-py)-(px-qx)*(ry-py)))
+		}
+		
+		function distSq(p1, p2){
+			return Math.pow((p1[1]-p2[1]),2) + Math.pow((p1[0]-p2[0]),2);
+		}
+		
+		function dist(p1, p2){
+			return distSq(p1, p2)**0.5
+		}
+		
+		$(".calculate").on("click", function(){
+			prevmgr = wp[0]
+			tdist = 0
+			for(var i=1; i<wp.length; i++){
+				tdist += dist(mgr(wp[i]), prevmgr)
+				prevmgr = mgr(wp[i])
+				console.log(mgr(wp[i]))
+			}
+			console.log(tdist)
+			$("span.distancedisplay").html(((tdist/1000).toString())+"km")
+			$("span.traveltime").html((parseInt(tdist / 500).toString())+"min")	
+			$(".routetable").show();
+		});
+		
+		function plotPoints(){
+			clearMarkers()
+			var pointlist={
+				type: "FeatureCollection",
+				features:[]
+			}	
+			for(var i=0; i<wp.length;i++){
+				lat = wp[i][1]; lng = wp[i][0]
+				var coordStr = lat.toString() + ", " + lng.toString()
+				pointlist.features.push(
+					{"type":"Feature",
+						"geometry":{
+							"type":"Point",
+							"coordinates":[lng, lat]},
+						"properties":{
+							"title":i.toString(),
+							"description":coordStr,
+							"marker-color": '#f0a',
+							"message": "ur mom gay",
+							"marker-symbol":i.toString(),
+							"iconSize":[20,20]
+					}
+					}
+				)
+			}
+			
+			console.log(pointlist)
+			
+			for(var i=0; i<pointlist.features.length; i++){
+				marker = pointlist.features[i]
+				var el = document.createElement('div');
+				el.innerHTML = marker.properties.title
+				el.className = 'marker';
+				el.style.backgroundImage = 'res/' + marker.properties.title + '.png';
+				el.style.width = marker.properties.iconSize[0] + 'px';
+				el.style.height = marker.properties.iconSize[1] + 'px';
+
+				
+				el.addEventListener('click', function() {
+					console.log("Hi")
+				});
+				
+
+				// add marker to map
+				prevmarker = markers[i]
+				if(prevmarker != 0){
+					prevmarker.remove()
+				}
+				markers[i] = new mapboxgl.Marker(el)
+					.setLngLat(marker.geometry.coordinates)
+					.addTo(map)
+				
+			}
+			
+		}
+				
+		
+		function clearMarkers(){
+			routeData={
+				type: "FeatureCollection",
+				features:[]
+			}
+			
+		}	
+		
+			
+		clearButton.on("click", function(e){
+			clearMarkers();
+			$(".routetable").hide()
+			for(var i=0; i<n;i++){
+				selector = ".waypoint#" + i.toString()
+				$(selector).val("")
+			}
+		});
+		
+		
+	
+		
+		
+		$('.waypoints').on('click', '.waypoint', function(e){			
+			focus = parseInt(this.id)
+			console.log(focus)
+		});
+		
+		
+		$('.add').on('click', function(e){
+			index = n
+			appendstring = "<input type=\"text\", class=\"waypoint\", id=\"" + (index).toString() + "\" /> " + index.toString() + "<br>"
+			$('.waypoints').append(appendstring)
+			n = n + 1
+			wp.push([0, 0])
+			markers.push(0)
+		});
+		
+		map.on('click', function(e){
+			lat = e.lngLat.lat 
+			lng = e.lngLat.lng
+			coo = lat.toString() + ", " + lng.toString()
+			console.log(focus)
+			wp[focus] = [e.lngLat.lng, e.lngLat.lat]
+			selector = '.waypoint#' + focus.toString()
+			console.log(selector)
+			$(selector).val(coo)
+			plotPoints()
+		});
+		
+		
+		map.on('click', 'markers', function (e) {
+			var coordinates = e.features[0].geometry.coordinates.slice();
+			var description = e.features[0].properties.description;
+
+			// Ensure that if the map is zoomed out such that multiple
+			// copies of the feature are visible, the popup appears
+			// over the copy being pointed to.
+			while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+				coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+			}
+
+			new mapboxgl.Popup()
+				.setLngLat(coordinates)
+				.setHTML(description)
+				.addTo(map);
+		});
+
+		// Change the cursor to a pointer when the mouse is over the places layer.
+		map.on('mouseenter', 'markers', function () {
+			map.getCanvas().style.cursor = 'pointer';
+		});
+
+		// Change it back to a pointer when it leaves.
+		map.on('mouseleave', 'markers', function () {
+			map.getCanvas().style.cursor = '';
+		});
+		
+		
+		$(".routetable").hide();
+		$(".routedetail").hide();
+		
+	});
+
+</script>
+	
+<div class='col-md-3' id='sidebar'>
+	<input type="button", value="Clear", class="clear" /><br>
+	<input type="button", value="Add Waypoint", class="add" /><br>
+	<div class="waypointswrapper">
+		<div class="waypoints">	
+			<input type="text", class="waypoint", id="0" /> START<br>
+			<input type="text", class="waypoint" id="1" /> 1<br>
+		</div>
+		<input type="button", value="Find route!", class="calculate" /><br>
+	</div>
+	<p>Travel distance: <span class="distancedisplay">x</span></p>
+	<p>Route Options</p>
+	<input type="checkbox" name="option1" />Fastest Travel Time<br>
+	<input type="checkbox" name="option1" />Prefer Train<br>
+	<input type="checkbox" name="option1" />Prefer Bus<br>
+	<input type="checkbox" name="option1" />Prefer Getting a Seat<br>	
+	
+	<h2>Suggested Route</h2>
+	<span id="suggestedroute">
+		<table class="routetable">
+			<tr>
+			<td>
+				Route 1 ($0.97)
+			</td><td>
+				<ol>
+					<li>Fastest travel time</li>
+					<li>Travel time: 30 - 50 minutes</li>
+					<li>Wheelchair accessible</li>
+					<li>5 minutes of walking</li><br>
+					<li>Crowd level: 8/10</li>
+				</ol>
+				
+			</td>
+			</tr>
+			
+			<tr>
+			<td>
+				Route 2 ($0.89)
+			</td><td>
+				<ol>
+					<li>70% chance of finding a seat</li>
+					<li>Second fastest</li>
+					<li>Travel time: 40 - 55 minutes</li>
+					<li>10 minutes of walking</li><br>
+					<li>Crowd level: 7/10</li>
+				</ol>
+			</td>
+			</tr>
+			
+			<tr>
+			<td>
+				Route 3 ($1.57)
+			</td><td>
+				<ol>
+					<li>Travel time: 50 - 55 minutes</li>
+					<li>10 minutes of walking</li>
+					<li>No transfers</li><br>
+					<li>Crowd level: 4/10</li>
+				</ol>
+			</td>
+			</tr>
+			
+		</table>
+		
+	</span>
+</div>
+	
+<div class='col-md-7' id='map-container'><div id='map'></div></div>
+<div class='col-md-2' id='details'>
+	<div class="detailpane">
+		<h2>User Profile</h2>
+		<p>Username: nicholas</p>
+		<p>Preferences:</p>
+		<ol>
+			<li>Prefers train</li>
+			<li>Crowd levels &lt; 10</li>
+		</ol>
+	</div>
+	
+	<div class="routedetail">
+		<h2>Route:</h2>
+		<p>Lorem ipsum dolor sit amet</p>
+	</div>
+</div>
+
+<script>
+	
+</script>
+
+
+</body>
+</html>
